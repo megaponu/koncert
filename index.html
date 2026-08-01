@@ -171,16 +171,6 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 #timecode { font-size: 11px; color: #888; white-space: nowrap; }
 #timecode .cur { color: #ddd; }
 
-#volWrap { display: flex; align-items: center; gap: 6px; }
-#volSlider { width: 70px; accent-color: #2d7dd2; cursor: pointer; }
-
-#lockDot {
-  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: #666; margin-right: 6px; vertical-align: middle;
-}
-#lockDot.on { background: #3fb950; }
-#lockDot.waiting { background: #c9a227; }
-
 @media (max-width: 640px) {
   #queuePanel { width: 100%; }
   #transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
@@ -210,14 +200,10 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
   <button class="tbtn play" id="playBtn">▶</button>
   <button class="tbtn" id="nextBtn">▶▶</button>
   <div id="nowPlaying">
-    <div class="t"><span id="lockDot" title="статус контроля"></span><span id="npTitle">—</span></div>
+    <div class="t" id="npTitle">—</div>
   </div>
   <div id="seek"><div id="seekFill"></div></div>
   <div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
-  <div id="volWrap">
-    <span>🔊</span>
-    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="1">
-  </div>
   <button class="tbtn" id="hideBtn" title="скрыть интерфейс">◡</button>
 </div>
 <button id="uiShow" aria-label="показать интерфейс">◠</button>
@@ -231,7 +217,7 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getDatabase, ref, onValue, update, set, onDisconnect, serverTimestamp
+  getDatabase, ref, onValue, update, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
 import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged
@@ -255,12 +241,6 @@ const auth = getAuth(app);
 const HOST_EMAIL = "host@koncert.local";
 
 const stateRef = ref(db, "room/state");
-const hostLockRef = ref(db, "room/hostLock");
-
-// уникальный id именно этой вкладки/сессии — нужен, чтобы отличать
-// разных "ведущих", даже если они вошли с одним и тем же паролем/аккаунтом
-const sessionId = crypto.randomUUID();
-const LOCK_STALE_MS = 15000; // если хартбит не обновлялся дольше — считаем сессию мёртвой
 
 // поправка на разницу между часами клиента и сервера Firebase
 let serverOffset = 0;
@@ -270,17 +250,13 @@ onValue(ref(db, ".info/serverTimeOffset"), snap => {
 function nowServer() { return Date.now() + serverOffset; }
 
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src: encodeURI("pidor.mp4") },
-  { title:"петушок великий", src: encodeURI("petyx(nastoyachi).mp4") }
+  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a6e7ab9&is=6a6d2939&hm=9139f8a0155670e0a1cb21bad83f207402ca3e0be621145605c7cdabc202131d&" },
+  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a6e7aba&is=6a6d293a&hm=b25e88edc1bad832385f63ffa1699b28ca3a567d65ca79e9ec07d3cfd901b14d&" }
 ];
 
 let current = 0;
 let fadeTimeoutId = null;
 let isHost = false;
-let haveLock = false;      // держит ли эта вкладка эксклюзивный замок на запись состояния
-let localVolume = 1;
-let lockHeartbeatTimer = null;
-let lockRetryTimer = null;
 let lastKnownState = null;
 let initializedFromRemote = false;
 
@@ -299,8 +275,6 @@ const mediaEl = document.getElementById('mediaEl');
 const hostUnlockBtn = document.getElementById('hostUnlock');
 const hostUnlockBox = document.getElementById('hostUnlockBox');
 const hostPassInput = document.getElementById('hostPassInput');
-const volSlider = document.getElementById('volSlider');
-const lockDot = document.getElementById('lockDot');
 
 qCount.textContent = tracks.length + ' шт.';
 
@@ -382,12 +356,6 @@ mediaEl.addEventListener('ended', ()=>{
 function nextTrack(){ current=(current+1)%tracks.length; loadTrack(); renderQueue(); play(); }
 function prevTrack(){ current=(current-1+tracks.length)%tracks.length; loadTrack(); renderQueue(); play(); }
 
-volSlider.addEventListener('input', ()=>{
-  localVolume = parseFloat(volSlider.value);
-  mediaEl.volume = localVolume;
-  if (isHost) writeState();
-});
-
 playBtn.addEventListener('click', ()=>{ mediaEl.paused ? play() : pause(); });
 document.getElementById('nextBtn').addEventListener('click', nextTrack);
 document.getElementById('prevBtn').addEventListener('click', prevTrack);
@@ -432,19 +400,106 @@ document.getElementById('stage').addEventListener('click', () => {
   }
 });
 
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) pause();
+});
+window.addEventListener('blur', () => {
+  pause();
+});
+
 /* ============ синхронизация ============ */
 
 function writeState(){
-  if (!isHost || !haveLock) return;
+  if (!isHost) return;
   update(stateRef, {
     track: current,
     isPlaying: !mediaEl.paused,
     position: mediaEl.currentTime || 0,
-    volume: localVolume,
-    updatedAt: serverTimestamp(),
-    session: sessionId
+    updatedAt: serverTimestamp()
   });
 }
+
+function expectedPosition(state){
+  if (!state) return 0;
+  if (!state.isPlaying) return state.position || 0;
+  const elapsedSec = (nowServer() - (state.updatedAt || nowServer())) / 1000;
+  return (state.position || 0) + Math.max(0, elapsedSec);
+}
+
+const DRIFT_THRESHOLD = 1.2; // секунд — правим позицию только если разошлись сильнее
+
+function applyRemoteState(state){
+  if (!state) return;
+
+  if (state.track !== current && tracks[state.track]) {
+    current = state.track;
+    loadTrack();
+    renderQueue();
+  }
+
+  const target = expectedPosition(state);
+  if (Math.abs(mediaEl.currentTime - target) > DRIFT_THRESHOLD) {
+    mediaEl.currentTime = target;
+  }
+
+  if (state.isPlaying && mediaEl.paused) {
+    mediaEl.play().catch(()=>{});
+  } else if (!state.isPlaying && !mediaEl.paused) {
+    mediaEl.pause();
+  }
+}
+
+onValue(stateRef, snapshot => {
+  const state = snapshot.val();
+  lastKnownState = state;
+  // самый первый снапшот применяем всегда (в т.ч. ведущему — чтобы при
+  // перезагрузке страницы концерт не сбрасывался на первый трек)
+  if (!isHost || !initializedFromRemote) {
+    applyRemoteState(state);
+  }
+  initializedFromRemote = true;
+});
+
+// доп. досверка раз в 5 секунд — страхует от накопленного дрейфа,
+// если по какой-то причине не пришло промежуточное обновление
+setInterval(() => {
+  if (!isHost && lastKnownState) applyRemoteState(lastKnownState);
+}, 5000);
+
+/* ============ вход как ведущий ============ */
+
+function tryLogin(){
+  const pass = hostPassInput.value;
+  if (!pass) return;
+  signInWithEmailAndPassword(auth, HOST_EMAIL, pass)
+    .then(() => {
+      hostPassInput.value = '';
+      hostUnlockBox.classList.remove('open');
+    })
+    .catch(() => {
+      hostPassInput.classList.add('err');
+      setTimeout(()=>hostPassInput.classList.remove('err'), 300);
+    });
+}
+
+hostUnlockBtn.addEventListener('click', () => {
+  hostUnlockBox.classList.toggle('open');
+  if (hostUnlockBox.classList.contains('open')) hostPassInput.focus();
+});
+hostPassInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') tryLogin();
+});
+
+onAuthStateChanged(auth, user => {
+  isHost = !!user;
+  document.body.classList.toggle('guest-mode', !isHost);
+});
+
+loadTrack();
+renderQueue();
+</script>
+</body>
+</html>
 
 function expectedPosition(state){
   if (!state) return 0;
