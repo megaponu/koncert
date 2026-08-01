@@ -11,10 +11,7 @@ body { font-family: Arial, sans-serif; font-size: 13px; background: #000; color:
 
 /* ---------- сцена ---------- */
 #stage { position: fixed; inset: 0; background: #000; overflow: hidden; cursor: pointer; }
-#screen {
-  position: absolute; inset: 0;
-  background: #000;
-}
+#screen { position: absolute; inset: 0; background: #000; }
 #mediaEl {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
@@ -23,17 +20,11 @@ body { font-family: Arial, sans-serif; font-size: 13px; background: #000; color:
   opacity: 1;
 }
 #mediaEl.loaded { display: block; }
+#mediaEl.faded-out { opacity: 0; transition: opacity 1.5s ease-in-out; }
 
-/* Эффект плавного затухания СТРОГО при добавлении класса в конце */
-#mediaEl.faded-out {
-  opacity: 0;
-  transition: opacity 1.5s ease-in-out;
-}
-
-/* ---------- скрытие интерфейса ---------- */
+/* ---------- скрытие интерфейса (для ХОСТА, ручной toggle) ---------- */
 body.ui-hidden #queueToggle,
 body.ui-hidden #transport { display: none; }
-
 body.ui-hidden #uiShow {
   position: fixed; bottom: 12px; right: 12px; z-index: 8;
   width: 28px; height: 28px;
@@ -45,6 +36,11 @@ body.ui-hidden #uiShow {
 }
 body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 #uiShow { display: none; }
+
+/* ---------- режим ЗРИТЕЛЯ: UI не показываем вообще, пока не стал хостом ---------- */
+body.viewer #queueToggle,
+body.viewer #transport,
+body.viewer #uiShow { display: none !important; }
 
 /* ---------- плейлист ---------- */
 #queueToggle {
@@ -68,11 +64,7 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 #queueClose:hover { color: #333; border-color: #bbb; }
 #queueClose:focus-visible { outline: 2px solid #2d7dd2; outline-offset: 2px; }
 
-#queueOverlay {
-  position: fixed; inset: 0; z-index: 6;
-  background: transparent;
-  display: none;
-}
+#queueOverlay { position: fixed; inset: 0; z-index: 6; background: transparent; display: none; }
 #queueOverlay.open { display: block; }
 
 #queuePanel {
@@ -84,7 +76,6 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
   display: flex; flex-direction: column;
 }
 #queuePanel.open { transform: translateX(0); }
-
 #queuePanel .qhead {
   padding: 14px 16px; border-bottom: 2px solid #f0f0f0;
   font-size: 13px; font-weight: bold; color: #111;
@@ -92,12 +83,7 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 }
 #queuePanel .qhead span.count { font-size: 11px; color: #bbb; font-weight: normal; }
 #queueList { overflow-y: auto; flex: 1; }
-.qrow {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
-}
+.qrow { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; }
 .qrow:hover { background: #f5f9ff; }
 .qrow:focus-visible { outline: 2px solid #2d7dd2; outline-offset: -2px; }
 .qrow.active { background: #f5f9ff; border-left: 3px solid #2d7dd2; padding-left: 13px; }
@@ -122,14 +108,9 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 .tbtn:focus-visible { outline: 2px solid #2d7dd2; outline-offset: 2px; }
 .tbtn.play { color: #fff; border-color: #888; background: #333; min-width: 48px; text-align: center; }
 .tbtn.play:hover { background: #3a3a3a; }
-
 #nowPlaying { min-width: 0; }
 #nowPlaying .t { font-size: 13px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-#seek {
-  flex: 1; height: 4px; background: #444;
-  position: relative; cursor: pointer;
-}
+#seek { flex: 1; height: 4px; background: #444; position: relative; cursor: pointer; }
 #seekFill { position: absolute; left: 0; top: 0; bottom: 0; background: #2d7dd2; width: 0%; }
 #timecode { font-size: 11px; color: #888; white-space: nowrap; }
 #timecode .cur { color: #ddd; }
@@ -139,9 +120,34 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
   #transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
   #seek { order: 4; width: 100%; }
 }
+
+/* ---------- вход хоста: незаметная точка + строка пароля ---------- */
+#hostAuth {
+  position: fixed; bottom: 10px; right: 10px; z-index: 9;
+  display: flex; align-items: center; gap: 6px;
+}
+#hostDot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #666; opacity: 0.22; border: none; padding: 0;
+  cursor: pointer;
+}
+#hostDot:hover { opacity: 0.55; }
+#hostPass {
+  display: none; width: 110px;
+  font-family: inherit; font-size: 11px;
+  background: #111; border: 1px solid #444; color: #ddd;
+  padding: 4px 7px; outline: none;
+}
+#hostPass.open { display: inline-block; }
+#hostPass.err { border-color: #c33; animation: hpShake 0.3s; }
+@keyframes hpShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
 </style>
 </head>
-<body>
+<body class="viewer">
 
 <div id="stage">
   <div id="screen"></div>
@@ -150,7 +156,6 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 
 <button id="queueToggle" aria-label="плейлист">☰</button>
 <div id="queueOverlay"></div>
-
 <div id="queuePanel">
   <div class="qhead">
     <span>плейлист <span class="count" id="qCount"></span></span>
@@ -163,20 +168,25 @@ body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
   <button class="tbtn" id="prevBtn">◀◀</button>
   <button class="tbtn play" id="playBtn">▶</button>
   <button class="tbtn" id="nextBtn">▶▶</button>
-  <div id="nowPlaying">
-    <div class="t" id="npTitle">—</div>
-  </div>
+  <div id="nowPlaying"><div class="t" id="npTitle">—</div></div>
   <div id="seek"><div id="seekFill"></div></div>
   <div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
   <button class="tbtn" id="hideBtn" title="скрыть интерфейс">◡</button>
 </div>
-
 <button id="uiShow" aria-label="показать интерфейс">◠</button>
+
+<div id="hostAuth">
+  <input id="hostPass" type="password" autocomplete="off" spellcheck="false">
+  <button id="hostDot" aria-label=""></button>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
 <script>
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a6e7ab9&is=6a6d2939&hm=9139f8a0155670e0a1cb21bad83f207402ca3e0be621145605c7cdabc202131d&" },
-  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a6e7aba&is=6a6d293a&hm=b25e88edc1bad832385f63ffa1699b28ca3a567d65ca79e9ec07d3cfd901b14d&" }
+  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a673a79&is=6a65e8f9&hm=ef6e4bc4e34ebe829532f4be782b1da7d9552536314cb2e31282a3742d84d584&" },
+  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a673a7a&is=6a65e8fa&hm=8f9fe12d195ebc8de697efd7cab7a8c2b47fba5619de3a2e63ac623db011faba&" }
 ];
 
 let current = 0;
@@ -207,9 +217,7 @@ function renderQueue(){
   queueList.innerHTML = tracks.map((t,i)=>`
     <div class="qrow${i===current?' active':''}" tabindex="0" data-i="${i}">
       <span class="n">${String(i+1).padStart(2,'0')}</span>
-      <div class="meta">
-        <div class="t">${t.title}</div>
-      </div>
+      <div class="meta"><div class="t">${t.title}</div></div>
     </div>`).join('');
   queueList.querySelectorAll('.qrow').forEach(row=>{
     row.addEventListener('click', ()=>selectTrack(+row.dataset.i));
@@ -217,9 +225,8 @@ function renderQueue(){
   });
 }
 
-function selectTrack(i){ current=i; loadTrack(); renderQueue(); play(); }
+function selectTrack(i){ if(!isHost) return; current=i; loadTrack(); renderQueue(); play(); }
 
-// Сброс эффекта темноты при любых действиях (перемотка, запуск, новый трек)
 function resetFade() {
   clearTimeout(fadeTimeoutId);
   mediaEl.classList.remove('faded-out');
@@ -237,7 +244,7 @@ function loadTrack(){
   mediaEl.load();
 }
 
-function play(){ mediaEl.play(); }
+function play(){ mediaEl.play().catch(()=>{}); }
 function pause(){ mediaEl.pause(); }
 
 mediaEl.addEventListener('loadedmetadata', ()=>{ tTot.textContent = fmt(mediaEl.duration); });
@@ -249,79 +256,154 @@ mediaEl.addEventListener('timeupdate', ()=>{
   tCur.textContent = fmt(mediaEl.currentTime);
 });
 
-// Отслеживаем воспроизведение и сразу убираем темноту, если запустили заново
-mediaEl.addEventListener('play', ()=>{ 
-  resetFade(); 
-  playBtn.textContent = '❚❚'; 
-});
-mediaEl.addEventListener('pause', ()=>{ playBtn.textContent = '▶'; });
-
-// Мгновенный сброс эффекта при перемотке назад/вперед
+mediaEl.addEventListener('play', ()=>{ resetFade(); playBtn.textContent = '❚❚'; pushState(); });
+mediaEl.addEventListener('pause', ()=>{ playBtn.textContent = '▶'; pushState(); });
 mediaEl.addEventListener('seeking', resetFade);
 mediaEl.addEventListener('seeked', resetFade);
 
-// Поведение строго в конце видео: задержка 2.5 сек, затем плавное исчезновение
 mediaEl.addEventListener('ended', ()=>{
   clearTimeout(fadeTimeoutId);
-  fadeTimeoutId = setTimeout(() => {
-    if (mediaEl.ended) {
-      mediaEl.classList.add('faded-out');
-    }
-  }, 2500); 
+  fadeTimeoutId = setTimeout(() => { if (mediaEl.ended) mediaEl.classList.add('faded-out'); }, 2500);
 });
 
-function nextTrack(){ current=(current+1)%tracks.length; loadTrack(); renderQueue(); play(); }
-function prevTrack(){ current=(current-1+tracks.length)%tracks.length; loadTrack(); renderQueue(); play(); }
+function nextTrack(){ if(!isHost) return; current=(current+1)%tracks.length; loadTrack(); renderQueue(); play(); }
+function prevTrack(){ if(!isHost) return; current=(current-1+tracks.length)%tracks.length; loadTrack(); renderQueue(); play(); }
 
-playBtn.addEventListener('click', ()=>{ mediaEl.paused ? play() : pause(); });
+playBtn.addEventListener('click', ()=>{ if(!isHost) return; mediaEl.paused ? play() : pause(); });
 document.getElementById('nextBtn').addEventListener('click', nextTrack);
 document.getElementById('prevBtn').addEventListener('click', prevTrack);
+
 queueToggle.addEventListener('click', ()=>{
-  queuePanel.classList.add('open');
-  queueOverlay.classList.add('open');
-  queueToggle.classList.add('hidden');
+  queuePanel.classList.add('open'); queueOverlay.classList.add('open'); queueToggle.classList.add('hidden');
 });
 function closeQueue(){
-  queuePanel.classList.remove('open');
-  queueOverlay.classList.remove('open');
-  queueToggle.classList.remove('hidden');
+  queuePanel.classList.remove('open'); queueOverlay.classList.remove('open'); queueToggle.classList.remove('hidden');
 }
 document.getElementById('queueClose').addEventListener('click', closeQueue);
 document.getElementById('queueOverlay').addEventListener('click', closeQueue);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeQueue(); });
 
 document.getElementById('seek').addEventListener('click', e=>{
-  if(!mediaEl.duration) return;
+  if(!isHost || !mediaEl.duration) return;
   const r = e.currentTarget.getBoundingClientRect();
   mediaEl.currentTime = ((e.clientX-r.left)/r.width) * mediaEl.duration;
+  pushState();
 });
 
-document.getElementById('hideBtn').addEventListener('click', ()=>{
-  document.body.classList.add('ui-hidden');
-});
-document.getElementById('uiShow').addEventListener('click', ()=>{
-  document.body.classList.remove('ui-hidden');
-});
-document.addEventListener('keydown', e=>{
-  if(e.key.toLowerCase()==='h') document.body.classList.toggle('ui-hidden');
-});
+document.getElementById('hideBtn').addEventListener('click', ()=>{ document.body.classList.add('ui-hidden'); });
+document.getElementById('uiShow').addEventListener('click', ()=>{ document.body.classList.remove('ui-hidden'); });
+document.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='h' && isHost) document.body.classList.toggle('ui-hidden'); });
 
-// Клик по самому экрану/видео ставит его на паузу или запускает обратно
+// Клик по экрану: у хоста — play/pause, у зрителя — просто "разбудить" автоплей/звук
 document.getElementById('stage').addEventListener('click', () => {
-  mediaEl.paused ? play() : pause();
+  if(isHost){ mediaEl.paused ? play() : pause(); }
+  else if(mediaEl.paused){ mediaEl.play().catch(()=>{}); }
 });
 
-// Автопауза при сворачивании окна / переходе на другую вкладку / клике на другую программу
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pause();
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+window.addEventListener('blur', () => { pause(); });
+
+/* ================= FIREBASE: СИНХРОНИЗАЦИЯ ================= */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDOCVqJ45mFqSfc3IOJ3pvXtFKUtpq311E",
+  authDomain: "koncert-f2c3a.firebaseapp.com",
+  databaseURL: "https://koncert-f2c3a-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "koncert-f2c3a",
+  storageBucket: "koncert-f2c3a.firebasestorage.app",
+  messagingSenderId: "513334037791",
+  appId: "1:513334037791:web:b9c1c3a4bcf68e7419342a"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let isHost = false;
+let hostSecret = null;
+let pendingFollowerState = null;
+
+const hostDot = document.getElementById('hostDot');
+const hostPass = document.getElementById('hostPass');
+
+hostDot.addEventListener('click', () => {
+  hostPass.classList.toggle('open');
+  if(hostPass.classList.contains('open')) hostPass.focus();
 });
-window.addEventListener('blur', () => {
-  pause();
+
+hostPass.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter') tryAuth(hostPass.value);
 });
+
+function currentStatePayload(secret){
+  return {
+    'room/state': {
+      trackIndex: current,
+      isPlaying: !mediaEl.paused,
+      position: mediaEl.currentTime || 0,
+      ts: firebase.database.ServerValue.TIMESTAMP
+    },
+    'room/secretCheck': secret
+  };
+}
+
+function tryAuth(pass){
+  if(!pass) return;
+  db.ref().update(currentStatePayload(pass)).then(() => {
+    isHost = true;
+    hostSecret = pass;
+    document.body.classList.remove('viewer');
+    hostPass.classList.remove('open');
+    hostPass.value = '';
+  }).catch(() => {
+    hostPass.classList.add('err');
+    hostPass.value = '';
+    setTimeout(()=>hostPass.classList.remove('err'), 350);
+  });
+}
+
+function pushState(){
+  if(!isHost || !hostSecret) return;
+  db.ref().update(currentStatePayload(hostSecret));
+}
+
+setInterval(pushState, 5000); // хартбит — на случай пропущенных событий и для точного дрейфа
+
+db.ref('room/state').on('value', (snap) => {
+  const s = snap.val();
+  if(!s || isHost) return; // хост сам себя не корректирует
+
+  if(s.trackIndex !== current){
+    pendingFollowerState = s;
+    current = s.trackIndex;
+    loadTrack();
+    renderQueue();
+  } else {
+    applyFollowerState(s);
+  }
+});
+
+mediaEl.addEventListener('loadeddata', () => {
+  if(pendingFollowerState){
+    applyFollowerState(pendingFollowerState);
+    pendingFollowerState = null;
+  }
+});
+
+function applyFollowerState(s){
+  const elapsed = (s.isPlaying && s.ts) ? (Date.now() - s.ts) / 1000 : 0;
+  const target = Math.max(0, s.position + elapsed);
+
+  if(Math.abs(mediaEl.currentTime - target) > 0.75){
+    mediaEl.currentTime = target;
+  }
+  if(s.isPlaying && mediaEl.paused){
+    mediaEl.play().catch(()=>{});
+  } else if(!s.isPlaying && !mediaEl.paused){
+    mediaEl.pause();
+  }
+}
 
 loadTrack();
 renderQueue();
 </script>
-
 </body>
 </html>
