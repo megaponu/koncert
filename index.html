@@ -8,86 +8,95 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; overflow: hidden; }
 body { font-family: Arial, sans-serif; font-size: 13px; background: #000; color: #222; }
+
 /* ---------- сцена ---------- */
 #stage { position: fixed; inset: 0; background: #000; overflow: hidden; cursor: pointer; }
 #screen {
-position: absolute; inset: 0;
-background: #000;
+  position: absolute; inset: 0;
+  background: #000;
 }
 #mediaEl {
-position: absolute; inset: 0;
-width: 100%; height: 100%;
-object-fit: cover;
-display: none;
-opacity: 1;
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: none;
+  opacity: 1;
 }
 #mediaEl.loaded { display: block; }
+
 /* Эффект плавного затухания СТРОГО при добавлении класса в конце */
 #mediaEl.faded-out {
-opacity: 0;
-transition: opacity 1.5s ease-in-out;
+  opacity: 0;
+  transition: opacity 1.5s ease-in-out;
 }
+
 /* ---------- скрытие интерфейса ---------- */
 body.ui-hidden #queueToggle,
 body.ui-hidden #transport { display: none; }
+
 body.ui-hidden #uiShow {
-position: fixed; bottom: 12px; right: 12px; z-index: 8;
-width: 28px; height: 28px;
-background: #222; color: #aaa; border: none;
-font-family: inherit; font-size: 13px; line-height: 1;
-cursor: pointer;
-display: flex; align-items: center; justify-content: center;
-opacity: 0.5;
+  position: fixed; bottom: 12px; right: 12px; z-index: 8;
+  width: 28px; height: 28px;
+  background: #222; color: #aaa; border: none;
+  font-family: inherit; font-size: 13px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0.5;
 }
 body.ui-hidden #uiShow:hover { opacity: 1; color: #fff; }
 #uiShow { display: none; }
+
 /* ---------- плейлист ---------- */
 #queueToggle {
-position: fixed; top: 16px; left: 16px; z-index: 8;
-width: 32px; height: 32px;
-background: #222; color: #aaa; border: none;
-font-family: inherit; font-size: 14px; line-height: 1;
-cursor: pointer;
-display: flex; align-items: center; justify-content: center;
+  position: fixed; top: 16px; left: 16px; z-index: 8;
+  width: 32px; height: 32px;
+  background: #222; color: #aaa; border: none;
+  font-family: inherit; font-size: 14px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 #queueToggle:hover { color: #fff; }
 #queueToggle:focus-visible { outline: 2px solid #2d7dd2; outline-offset: 2px; }
 #queueToggle.hidden { display: none; }
+
 #queueClose {
-background: none; border: 1px solid #ddd; color: #999;
-font-family: inherit; font-size: 12px; line-height: 1;
-width: 22px; height: 22px;
-cursor: pointer;
+  background: none; border: 1px solid #ddd; color: #999;
+  font-family: inherit; font-size: 12px; line-height: 1;
+  width: 22px; height: 22px;
+  cursor: pointer;
 }
 #queueClose:hover { color: #333; border-color: #bbb; }
 #queueClose:focus-visible { outline: 2px solid #2d7dd2; outline-offset: 2px; }
+
 #queueOverlay {
-position: fixed; inset: 0; z-index: 6;
-background: transparent;
-display: none;
+  position: fixed; inset: 0; z-index: 6;
+  background: transparent;
+  display: none;
 }
 #queueOverlay.open { display: block; }
+
 #queuePanel {
-position: fixed; top: 0; bottom: 0; left: 0;
-width: 320px; z-index: 7;
-background: #fff;
-border-right: 1px solid #e5e5e5;
-transform: translateX(-100%);
-display: flex; flex-direction: column;
+  position: fixed; top: 0; bottom: 0; left: 0;
+  width: 320px; z-index: 7;
+  background: #fff;
+  border-right: 1px solid #e5e5e5;
+  transform: translateX(-100%);
+  display: flex; flex-direction: column;
 }
 #queuePanel.open { transform: translateX(0); }
+
 #queuePanel .qhead {
-padding: 14px 16px; border-bottom: 2px solid #f0f0f0;
-font-size: 13px; font-weight: bold; color: #111;
-display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; border-bottom: 2px solid #f0f0f0;
+  font-size: 13px; font-weight: bold; color: #111;
+  display: flex; align-items: center; justify-content: space-between;
 }
 #queuePanel .qhead span.count { font-size: 11px; color: #bbb; font-weight: normal; }
 #queueList { overflow-y: auto; flex: 1; }
 .qrow {
-display: flex; align-items: center; gap: 10px;
-padding: 10px 16px;
-border-bottom: 1px solid #f0f0f0;
-cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
 }
 .qrow:hover { background: #f5f9ff; }
 .qrow:focus-visible { outline: 2px solid #2d7dd2; outline-offset: -2px; }
@@ -96,72 +105,78 @@ cursor: pointer;
 .qrow.active .n { color: #2d7dd2; }
 .qrow .meta { min-width: 0; }
 .qrow .t { font-size: 13px; font-weight: bold; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ---------- нижняя панель управления ---------- */
 #transport {
-position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
-height: 48px; background: #222;
-display: flex; align-items: center;
-padding: 0 16px; gap: 16px;
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+  height: 48px; background: #222;
+  display: flex; align-items: center;
+  padding: 0 16px; gap: 16px;
 }
 .tbtn {
-background: none; border: 1px solid #444; color: #aaa;
-font-family: inherit; font-size: 12px;
-padding: 5px 10px; cursor: pointer;
+  background: none; border: 1px solid #444; color: #aaa;
+  font-family: inherit; font-size: 12px;
+  padding: 5px 10px; cursor: pointer;
 }
 .tbtn:hover { color: #fff; border-color: #666; }
 .tbtn:focus-visible { outline: 2px solid #2d7dd2; outline-offset: 2px; }
 .tbtn.play { color: #fff; border-color: #888; background: #333; min-width: 48px; text-align: center; }
 .tbtn.play:hover { background: #3a3a3a; }
+
 #nowPlaying { min-width: 0; }
 #nowPlaying .t { font-size: 13px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 #seek {
-flex: 1; height: 4px; background: #444;
-position: relative; cursor: pointer;
+  flex: 1; height: 4px; background: #444;
+  position: relative; cursor: pointer;
 }
 #seekFill { position: absolute; left: 0; top: 0; bottom: 0; background: #2d7dd2; width: 0%; }
 #timecode { font-size: 11px; color: #888; white-space: nowrap; }
 #timecode .cur { color: #ddd; }
+
 @media (max-width: 640px) {
-#queuePanel { width: 100%; }
-#transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
-#seek { order: 4; width: 100%; }
+  #queuePanel { width: 100%; }
+  #transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
+  #seek { order: 4; width: 100%; }
 }
 </style>
 </head>
 <body>
+
 <div id="stage">
-<div id="screen"></div>
-<video id="mediaEl" playsinline></video>
+  <div id="screen"></div>
+  <video id="mediaEl" playsinline></video>
 </div>
+
 <button id="queueToggle" aria-label="плейлист">☰</button>
 <div id="queueOverlay"></div>
-<div id="queuePanel">
-<div class="qhead">
-<span>плейлист <span class="count" id="qCount"></span></span>
-<button id="queueClose" aria-label="закрыть">✕</button>
-</div>
-<div id="queueList"></div>
-</div>
-<div id="transport">
-<button class="tbtn" id="prevBtn">◀◀</button>
-<button class="tbtn play" id="playBtn">▶</button>
-<button class="tbtn" id="nextBtn">▶▶</button>
-<div id="nowPlaying">
-<div class="t" id="npTitle">—</div>
-</div>
-<div id="seek"><div id="seekFill"></div></div>
-<div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
-<button class="tbtn" id="hideBtn" title="скрыть интерфейс">◡</button>
-</div>
-<button id="uiShow" aria-label="показать интерфейс">◠</button>
 
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<div id="queuePanel">
+  <div class="qhead">
+    <span>плейлист <span class="count" id="qCount"></span></span>
+    <button id="queueClose" aria-label="закрыть">✕</button>
+  </div>
+  <div id="queueList"></div>
+</div>
+
+<div id="transport">
+  <button class="tbtn" id="prevBtn">◀◀</button>
+  <button class="tbtn play" id="playBtn">▶</button>
+  <button class="tbtn" id="nextBtn">▶▶</button>
+  <div id="nowPlaying">
+    <div class="t" id="npTitle">—</div>
+  </div>
+  <div id="seek"><div id="seekFill"></div></div>
+  <div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
+  <button class="tbtn" id="hideBtn" title="скрыть интерфейс">◡</button>
+</div>
+
+<button id="uiShow" aria-label="показать интерфейс">◠</button>
 
 <script>
 const tracks = [
-{ title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a673a79&is=6a65e8f9&hm=ef6e4bc4e34ebe829532f4be782b1da7d9552536314cb2e31282a3742d84d584&" },
-{ title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a673a7a&is=6a65e8fa&hm=8f9fe12d195ebc8de697efd7cab7a8c2b47fba5619de3a2e63ac623db011faba&" }
+  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a6e7ab9&is=6a6d2939&hm=9139f8a0155670e0a1cb21bad83f207402ca3e0be621145605c7cdabc202131d&" },
+  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a6e7aba&is=6a6d293a&hm=b25e88edc1bad832385f63ffa1699b28ca3a567d65ca79e9ec07d3cfd901b14d&" }
 ];
 
 let current = 0;
@@ -182,114 +197,44 @@ const mediaEl = document.getElementById('mediaEl');
 
 qCount.textContent = tracks.length + ' шт.';
 
-// ==== Firebase sync ====
-const firebaseConfig = {
-  apiKey: "AIzaSyDOCVqJ45mFqSfc3IOJ3pvXtFKUtpq311E",
-  authDomain: "koncert-f2c3a.firebaseapp.com",
-  databaseURL: "https://koncert-f2c3a-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "koncert-f2c3a",
-  storageBucket: "koncert-f2c3a.firebasestorage.app",
-  messagingSenderId: "513334037791",
-  appId: "1:513334037791:web:b9c1c3a4bcf68e7419342a"
-};
-firebase.initializeApp(firebaseConfig);
-const roomRef = firebase.database().ref('room');
-
-const HOST_SECRET = "7777"; // тот же ключ, что вставлен в Rules
-
-const params = new URLSearchParams(location.search);
-let isHost = false;
-
-if (params.get('host') === '1') {
-  const saved = sessionStorage.getItem('koncertHostSecret');
-  const entered = saved || prompt('Пароль хоста:');
-  if (entered === HOST_SECRET) {
-    isHost = true;
-    sessionStorage.setItem('koncertHostSecret', entered);
-  } else {
-    alert('Неверный пароль — запускаюсь как зритель');
-  }
-}
-
-function broadcastState(){
-  if (!isHost) return;
-  roomRef.set({
-    trackIndex: current,
-    isPlaying: !mediaEl.paused,
-    position: mediaEl.currentTime || 0,
-    secret: HOST_SECRET,
-    ts: firebase.database.ServerValue.TIMESTAMP
-  });
-}
-
-// хост — heartbeat каждые 5 сек, пока играет (страховка на случай потери события)
-setInterval(()=>{ if (isHost && !mediaEl.paused) broadcastState(); }, 5000);
-
-// зритель — подписка на состояние (срабатывает сразу, в том числе и при перезагрузке)
-if (!isHost) {
-  roomRef.on('value', snap=>{
-    const s = snap.val();
-    if (!s) return;
-
-    if (s.trackIndex !== current) {
-      current = s.trackIndex;
-      loadTrack();
-      renderQueue();
-    }
-
-    const offsetSec = s.ts ? (Date.now() - s.ts) / 1000 : 0;
-    const expected = s.position + (s.isPlaying ? offsetSec : 0);
-
-    // корректируем, только если разъехались больше чем на 0.75 сек —
-    // защита от дёрганого видео при частых обновлениях хоста
-    if (Math.abs((mediaEl.currentTime || 0) - expected) > 0.75) {
-      mediaEl.currentTime = expected;
-    }
-
-    if (s.isPlaying && mediaEl.paused) mediaEl.play();
-    if (!s.isPlaying && !mediaEl.paused) mediaEl.pause();
-  });
-}
-// ==== /Firebase sync ====
-
 function fmt(s){
-if(!isFinite(s) || s < 0) s = 0;
-const m=Math.floor(s/60), sec=Math.floor(s%60);
-return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
+  if(!isFinite(s) || s < 0) s = 0;
+  const m=Math.floor(s/60), sec=Math.floor(s%60);
+  return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
 }
 
 function renderQueue(){
-queueList.innerHTML = tracks.map((t,i)=>`
-<div class="qrow${i===current?' active':''}" tabindex="0" data-i="${i}">
-<span class="n">${String(i+1).padStart(2,'0')}</span>
-<div class="meta">
-<div class="t">${t.title}</div>
-</div>
-</div>`).join('');
-queueList.querySelectorAll('.qrow').forEach(row=>{
-row.addEventListener('click', ()=>selectTrack(+row.dataset.i));
-row.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') selectTrack(+row.dataset.i); });
-});
+  queueList.innerHTML = tracks.map((t,i)=>`
+    <div class="qrow${i===current?' active':''}" tabindex="0" data-i="${i}">
+      <span class="n">${String(i+1).padStart(2,'0')}</span>
+      <div class="meta">
+        <div class="t">${t.title}</div>
+      </div>
+    </div>`).join('');
+  queueList.querySelectorAll('.qrow').forEach(row=>{
+    row.addEventListener('click', ()=>selectTrack(+row.dataset.i));
+    row.addEventListener('keydown', e=>{ if(e.key==='Enter'||e.key===' ') selectTrack(+row.dataset.i); });
+  });
 }
 
 function selectTrack(i){ current=i; loadTrack(); renderQueue(); play(); }
 
 // Сброс эффекта темноты при любых действиях (перемотка, запуск, новый трек)
 function resetFade() {
-clearTimeout(fadeTimeoutId);
-mediaEl.classList.remove('faded-out');
+  clearTimeout(fadeTimeoutId);
+  mediaEl.classList.remove('faded-out');
 }
 
 function loadTrack(){
-resetFade();
-const t = tracks[current];
-npTitle.textContent = t.title;
-seekFill.style.width = '0%';
-tCur.textContent = '00:00';
-tTot.textContent = '00:00';
-mediaEl.classList.remove('loaded');
-mediaEl.src = t.src;
-mediaEl.load();
+  resetFade();
+  const t = tracks[current];
+  npTitle.textContent = t.title;
+  seekFill.style.width = '0%';
+  tCur.textContent = '00:00';
+  tTot.textContent = '00:00';
+  mediaEl.classList.remove('loaded');
+  mediaEl.src = t.src;
+  mediaEl.load();
 }
 
 function play(){ mediaEl.play(); }
@@ -298,33 +243,31 @@ function pause(){ mediaEl.pause(); }
 mediaEl.addEventListener('loadedmetadata', ()=>{ tTot.textContent = fmt(mediaEl.duration); });
 mediaEl.addEventListener('loadeddata', ()=>{ mediaEl.classList.add('loaded'); });
 mediaEl.addEventListener('error', ()=>{ mediaEl.classList.remove('loaded'); });
-
 mediaEl.addEventListener('timeupdate', ()=>{
-const pct = mediaEl.duration ? Math.min(1, mediaEl.currentTime/mediaEl.duration) : 0;
-seekFill.style.width = (pct*100)+'%';
-tCur.textContent = fmt(mediaEl.currentTime);
+  const pct = mediaEl.duration ? Math.min(1, mediaEl.currentTime/mediaEl.duration) : 0;
+  seekFill.style.width = (pct*100)+'%';
+  tCur.textContent = fmt(mediaEl.currentTime);
 });
 
 // Отслеживаем воспроизведение и сразу убираем темноту, если запустили заново
-mediaEl.addEventListener('play', ()=>{
-resetFade();
-playBtn.textContent = '❚❚';
-broadcastState();
+mediaEl.addEventListener('play', ()=>{ 
+  resetFade(); 
+  playBtn.textContent = '❚❚'; 
 });
-mediaEl.addEventListener('pause', ()=>{ playBtn.textContent = '▶'; broadcastState(); });
+mediaEl.addEventListener('pause', ()=>{ playBtn.textContent = '▶'; });
 
 // Мгновенный сброс эффекта при перемотке назад/вперед
 mediaEl.addEventListener('seeking', resetFade);
-mediaEl.addEventListener('seeked', ()=>{ resetFade(); broadcastState(); });
+mediaEl.addEventListener('seeked', resetFade);
 
 // Поведение строго в конце видео: задержка 2.5 сек, затем плавное исчезновение
 mediaEl.addEventListener('ended', ()=>{
-clearTimeout(fadeTimeoutId);
-fadeTimeoutId = setTimeout(() => {
-if (mediaEl.ended) {
-mediaEl.classList.add('faded-out');
-}
-}, 2500);
+  clearTimeout(fadeTimeoutId);
+  fadeTimeoutId = setTimeout(() => {
+    if (mediaEl.ended) {
+      mediaEl.classList.add('faded-out');
+    }
+  }, 2500); 
 });
 
 function nextTrack(){ current=(current+1)%tracks.length; loadTrack(); renderQueue(); play(); }
@@ -333,56 +276,52 @@ function prevTrack(){ current=(current-1+tracks.length)%tracks.length; loadTrack
 playBtn.addEventListener('click', ()=>{ mediaEl.paused ? play() : pause(); });
 document.getElementById('nextBtn').addEventListener('click', nextTrack);
 document.getElementById('prevBtn').addEventListener('click', prevTrack);
-
 queueToggle.addEventListener('click', ()=>{
-queuePanel.classList.add('open');
-queueOverlay.classList.add('open');
-queueToggle.classList.add('hidden');
+  queuePanel.classList.add('open');
+  queueOverlay.classList.add('open');
+  queueToggle.classList.add('hidden');
 });
-
 function closeQueue(){
-queuePanel.classList.remove('open');
-queueOverlay.classList.remove('open');
-queueToggle.classList.remove('hidden');
+  queuePanel.classList.remove('open');
+  queueOverlay.classList.remove('open');
+  queueToggle.classList.remove('hidden');
 }
-
 document.getElementById('queueClose').addEventListener('click', closeQueue);
 document.getElementById('queueOverlay').addEventListener('click', closeQueue);
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeQueue(); });
 
 document.getElementById('seek').addEventListener('click', e=>{
-if(!mediaEl.duration) return;
-const r = e.currentTarget.getBoundingClientRect();
-mediaEl.currentTime = ((e.clientX-r.left)/r.width) * mediaEl.duration;
+  if(!mediaEl.duration) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  mediaEl.currentTime = ((e.clientX-r.left)/r.width) * mediaEl.duration;
 });
 
 document.getElementById('hideBtn').addEventListener('click', ()=>{
-document.body.classList.add('ui-hidden');
+  document.body.classList.add('ui-hidden');
 });
-
 document.getElementById('uiShow').addEventListener('click', ()=>{
-document.body.classList.remove('ui-hidden');
+  document.body.classList.remove('ui-hidden');
 });
-
 document.addEventListener('keydown', e=>{
-if(e.key.toLowerCase()==='h') document.body.classList.toggle('ui-hidden');
+  if(e.key.toLowerCase()==='h') document.body.classList.toggle('ui-hidden');
 });
 
 // Клик по самому экрану/видео ставит его на паузу или запускает обратно
 document.getElementById('stage').addEventListener('click', () => {
-mediaEl.paused ? play() : pause();
+  mediaEl.paused ? play() : pause();
 });
 
 // Автопауза при сворачивании окна / переходе на другую вкладку / клике на другую программу
 document.addEventListener('visibilitychange', () => {
-if (document.hidden) pause();
+  if (document.hidden) pause();
 });
 window.addEventListener('blur', () => {
-pause();
+  pause();
 });
 
 loadTrack();
 renderQueue();
 </script>
+
 </body>
 </html>
