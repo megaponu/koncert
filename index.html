@@ -171,6 +171,16 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 #timecode { font-size: 11px; color: #888; white-space: nowrap; }
 #timecode .cur { color: #ddd; }
 
+#volWrap { display: flex; align-items: center; gap: 6px; }
+#volSlider { width: 70px; accent-color: #2d7dd2; cursor: pointer; }
+
+#lockDot {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #666; margin-right: 6px; vertical-align: middle;
+}
+#lockDot.on { background: #3fb950; }
+#lockDot.waiting { background: #c9a227; }
+
 @media (max-width: 640px) {
   #queuePanel { width: 100%; }
   #transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
@@ -200,10 +210,15 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
   <button class="tbtn play" id="playBtn">▶</button>
   <button class="tbtn" id="nextBtn">▶▶</button>
   <div id="nowPlaying">
-    <div class="t" id="npTitle">—</div>
+    <div class="t"><span id="lockDot" title="статус контроля"></span><span id="npTitle">—</span></div>
   </div>
   <div id="seek"><div id="seekFill"></div></div>
   <div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
+  <div id="volWrap">
+    <span>🔊</span>
+    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="1">
+  </div>
+  <button class="tbtn" id="localMuteBtn" title="беззвучно только у тебя — у зрителей звук не меняется">🔈</button>
   <button class="tbtn" id="hideBtn" title="скрыть интерфейс">◡</button>
 </div>
 <button id="uiShow" aria-label="показать интерфейс">◠</button>
@@ -217,7 +232,7 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getDatabase, ref, onValue, update, serverTimestamp
+  getDatabase, ref, onValue, update, set, onDisconnect, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
 import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged
@@ -241,6 +256,12 @@ const auth = getAuth(app);
 const HOST_EMAIL = "host@koncert.local";
 
 const stateRef = ref(db, "room/state");
+const hostLockRef = ref(db, "room/hostLock");
+
+// уникальный id именно этой вкладки/сессии — нужен, чтобы отличать
+// разных "ведущих", даже если они вошли с одним и тем же паролем/аккаунтом
+const sessionId = crypto.randomUUID();
+const LOCK_STALE_MS = 15000; // если хартбит не обновлялся дольше — считаем сессию мёртвой
 
 // поправка на разницу между часами клиента и сервера Firebase
 let serverOffset = 0;
@@ -250,13 +271,18 @@ onValue(ref(db, ".info/serverTimeOffset"), snap => {
 function nowServer() { return Date.now() + serverOffset; }
 
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a71c679&is=6a7074f9&hm=ab40fd1b8cc0e2932e4bb495e17f69a3607d077645752c620983cdc71ec3bc0b&" },
-  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a71c67a&is=6a7074fa&hm=9064a379c8df3cfe90b31d3e5ba23e9210f9f2d60ac1c5a9d995c5e1960941e8&" }
+  { title:"лукашенко взлетает на вертолёт", src: encodeURI("pidor.mp4") },
+  { title:"петушок великий", src: encodeURI("petyx(nastoyachi).mp4") }
 ];
 
 let current = 0;
 let fadeTimeoutId = null;
 let isHost = false;
+let hostIntendPlaying = false; // осознанно ли ведущий хочет, чтобы видео играло (не путать с mediaEl.paused)
+let haveLock = false;      // держит ли эта вкладка эксклюзивный замок на запись состояния
+let localVolume = 1;
+let lockHeartbeatTimer = null;
+let lockRetryTimer = null;
 let lastKnownState = null;
 let initializedFromRemote = false;
 
@@ -275,8 +301,16 @@ const mediaEl = document.getElementById('mediaEl');
 const hostUnlockBtn = document.getElementById('hostUnlock');
 const hostUnlockBox = document.getElementById('hostUnlockBox');
 const hostPassInput = document.getElementById('hostPassInput');
+const volSlider = document.getElementById('volSlider');
+const localMuteBtn = document.getElementById('localMuteBtn');
+const lockDot = document.getElementById('lockDot');
 
 qCount.textContent = tracks.length + ' шт.';
+
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play', () => { if (isHost) play(); });
+  navigator.mediaSession.setActionHandler('pause', () => { if (isHost) pause(); });
+}
 
 function fmt(s){
   if(!isFinite(s) || s < 0) s = 0;
@@ -309,6 +343,9 @@ function loadTrack(){
   resetFade();
   const t = tracks[current];
   npTitle.textContent = t.title;
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.metadata = new MediaMetadata({ title: t.title });
+  }
   seekFill.style.width = '0%';
   tCur.textContent = '00:00';
   tTot.textContent = '00:00';
@@ -317,8 +354,8 @@ function loadTrack(){
   mediaEl.load();
 }
 
-function play(){ mediaEl.play().catch(()=>{}); }
-function pause(){ mediaEl.pause(); }
+function play(){ mediaEl.play().catch(()=>{}); hostIntendPlaying = true; }
+function pause(){ mediaEl.pause(); hostIntendPlaying = false; }
 
 mediaEl.addEventListener('loadedmetadata', ()=>{ tTot.textContent = fmt(mediaEl.duration); });
 mediaEl.addEventListener('loadeddata', ()=>{ mediaEl.classList.add('loaded'); });
@@ -332,29 +369,69 @@ mediaEl.addEventListener('timeupdate', ()=>{
 mediaEl.addEventListener('play', ()=>{
   resetFade();
   playBtn.textContent = '❚❚';
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
   if (isHost) writeState();
 });
 mediaEl.addEventListener('pause', ()=>{
   playBtn.textContent = '▶';
-  if (isHost) writeState();
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  if (isHost) {
+    if (hostIntendPlaying) {
+      // это браузер сам остановил декодирование (например, при сворачивании
+      // окна), а не осознанный клик по паузе — тихо возобновляем и не рвём
+      // трансляцию у зрителей
+      mediaEl.play().catch(()=>{});
+    } else {
+      writeState();
+    }
+  }
 });
+
+// более настойчивая подстраховка: после автопаузы от сворачивания окна
+// браузер иногда молча игнорирует одиночный повторный play() — поэтому
+// продолжаем пробовать раз в секунду, пока он не пустит воспроизведение
+// обратно (полностью гарантировать работу в свёрнутом окне на всех
+// браузерах нельзя — это ограничение самого браузера, а не кода)
+setInterval(() => {
+  if (isHost && hostIntendPlaying && mediaEl.paused) {
+    mediaEl.play().catch(()=>{});
+  }
+}, 1000);
 mediaEl.addEventListener('seeking', resetFade);
 mediaEl.addEventListener('seeked', ()=>{
   resetFade();
   if (isHost) writeState();
 });
 
-mediaEl.addEventListener('ended', ()=>{
+function triggerEndFade(){
   clearTimeout(fadeTimeoutId);
   fadeTimeoutId = setTimeout(() => {
-    if (mediaEl.ended) {
+    // проверяем именно paused, а не ended: у зрителя видео останавливается
+    // синхронизацией (isPlaying:false), а не собственным ended — см.
+    // applyRemoteState()
+    if (mediaEl.paused) {
       mediaEl.classList.add('faded-out');
     }
   }, 2500);
-});
+}
+mediaEl.addEventListener('ended', triggerEndFade);
 
 function nextTrack(){ current=(current+1)%tracks.length; loadTrack(); renderQueue(); play(); }
 function prevTrack(){ current=(current-1+tracks.length)%tracks.length; loadTrack(); renderQueue(); play(); }
+
+volSlider.addEventListener('input', ()=>{
+  localVolume = parseFloat(volSlider.value);
+  mediaEl.volume = localVolume;
+  if (isHost) writeState();
+});
+
+// локальный мьют — только на этом устройстве, в базу не пишется и на
+// зрителей никак не влияет (нужен ведущему, чтобы не слышать звук из
+// браузера вдвойне поверх звука из майна)
+localMuteBtn.addEventListener('click', () => {
+  mediaEl.muted = !mediaEl.muted;
+  localMuteBtn.textContent = mediaEl.muted ? '🔇' : '🔈';
+});
 
 playBtn.addEventListener('click', ()=>{ mediaEl.paused ? play() : pause(); });
 document.getElementById('nextBtn').addEventListener('click', nextTrack);
@@ -400,22 +477,17 @@ document.getElementById('stage').addEventListener('click', () => {
   }
 });
 
-document.addEventListener('visibilitychange', () => {
-  if (document.hidden) pause();
-});
-window.addEventListener('blur', () => {
-  pause();
-});
-
 /* ============ синхронизация ============ */
 
 function writeState(){
-  if (!isHost) return;
+  if (!isHost || !haveLock) return;
   update(stateRef, {
     track: current,
     isPlaying: !mediaEl.paused,
     position: mediaEl.currentTime || 0,
-    updatedAt: serverTimestamp()
+    volume: localVolume,
+    updatedAt: serverTimestamp(),
+    session: sessionId
   });
 }
 
@@ -446,6 +518,16 @@ function applyRemoteState(state){
     mediaEl.play().catch(()=>{});
   } else if (!state.isPlaying && !mediaEl.paused) {
     mediaEl.pause();
+  }
+
+  if (typeof state.volume === 'number' && Math.abs(mediaEl.volume - state.volume) > 0.001) {
+    mediaEl.volume = state.volume;
+    localVolume = state.volume;
+    volSlider.value = state.volume;
+  }
+
+  if (!state.isPlaying && mediaEl.duration && target >= mediaEl.duration - 0.5) {
+    triggerEndFade();
   }
 }
 
@@ -490,12 +572,57 @@ hostPassInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') tryLogin();
 });
 
+/* ============ эксклюзивный замок на управление (защита от 2+ ведущих) ============ */
+
+async function claimLock(){
+  try {
+    await set(hostLockRef, { session: sessionId, ts: serverTimestamp() });
+    haveLock = true;
+    lockDot.classList.remove('waiting');
+    lockDot.classList.add('on');
+    onDisconnect(hostLockRef).remove(); // если эта вкладка отвалится — замок освобождается сразу
+    if (lockRetryTimer) { clearInterval(lockRetryTimer); lockRetryTimer = null; }
+    if (!lockHeartbeatTimer) {
+      lockHeartbeatTimer = setInterval(() => {
+        if (!haveLock) return;
+        update(hostLockRef, { ts: serverTimestamp() }).catch(() => {
+          haveLock = false;
+          lockDot.classList.remove('on');
+        });
+      }, 8000);
+    }
+    writeState(); // сразу публикуем текущее локальное состояние зрителям
+  } catch (e) {
+    // замок сейчас держит другая (живая) сессия — просто периодически пробуем снова
+    haveLock = false;
+    lockDot.classList.remove('on');
+    lockDot.classList.add('waiting');
+    if (!lockRetryTimer) {
+      lockRetryTimer = setInterval(claimLock, LOCK_STALE_MS / 3);
+    }
+  }
+}
+
+function releaseLockLocal(){
+  haveLock = false;
+  lockDot.classList.remove('on', 'waiting');
+  if (lockHeartbeatTimer) { clearInterval(lockHeartbeatTimer); lockHeartbeatTimer = null; }
+  if (lockRetryTimer) { clearInterval(lockRetryTimer); lockRetryTimer = null; }
+}
+
 onAuthStateChanged(auth, user => {
   isHost = !!user;
   document.body.classList.toggle('guest-mode', !isHost);
+  if (isHost) claimLock();
+  else releaseLockLocal();
 });
 
 loadTrack();
+renderQueue();
+</script>
+</body>
+</html>
+
 renderQueue();
 </script>
 </body>
