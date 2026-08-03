@@ -258,8 +258,8 @@ onValue(ref(db, ".info/serverTimeOffset"), snap => {
 function nowServer() { return Date.now() + serverOffset; }
 
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a6e7ab9&is=6a6d2939&hm=9139f8a0155670e0a1cb21bad83f207402ca3e0be621145605c7cdabc202131d&" },
-  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a6e7aba&is=6a6d293a&hm=b25e88edc1bad832385f63ffa1699b28ca3a567d65ca79e9ec07d3cfd901b14d&" }
+  { title:"лукашенко взлетает на вертолёт", src: encodeURI("pidor.mp4") },
+  { title:"петушок великий", src: encodeURI("petyx(nastoyachi).mp4") }
 ];
 
 let current = 0;
