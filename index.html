@@ -174,13 +174,6 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 #volWrap { display: flex; align-items: center; gap: 6px; }
 #volSlider { width: 70px; accent-color: #2d7dd2; cursor: pointer; }
 
-#lockDot {
-  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-  background: #666; margin-right: 6px; vertical-align: middle;
-}
-#lockDot.on { background: #3fb950; }
-#lockDot.waiting { background: #c9a227; }
-
 @media (max-width: 640px) {
   #queuePanel { width: 100%; }
   #transport { flex-wrap: wrap; height: auto; padding: 8px 12px; gap: 8px 12px; }
@@ -210,7 +203,7 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
   <button class="tbtn play" id="playBtn">▶</button>
   <button class="tbtn" id="nextBtn">▶▶</button>
   <div id="nowPlaying">
-    <div class="t"><span id="lockDot" title="статус контроля"></span><span id="npTitle">—</span></div>
+    <div class="t" id="npTitle">—</div>
   </div>
   <div id="seek"><div id="seekFill"></div></div>
   <div id="timecode"><span class="cur" id="tCur">00:00</span> / <span id="tTot">00:00</span></div>
@@ -232,7 +225,7 @@ body:not(.guest-mode) #hostUnlockBox { display: none !important; }
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getDatabase, ref, onValue, update, set, onDisconnect, serverTimestamp
+  getDatabase, ref, onValue, update, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
 import {
   getAuth, signInWithEmailAndPassword, onAuthStateChanged
@@ -256,12 +249,6 @@ const auth = getAuth(app);
 const HOST_EMAIL = "host@koncert.local";
 
 const stateRef = ref(db, "room/state");
-const hostLockRef = ref(db, "room/hostLock");
-
-// уникальный id именно этой вкладки/сессии — нужен, чтобы отличать
-// разных "ведущих", даже если они вошли с одним и тем же паролем/аккаунтом
-const sessionId = crypto.randomUUID();
-const LOCK_STALE_MS = 15000; // если хартбит не обновлялся дольше — считаем сессию мёртвой
 
 // поправка на разницу между часами клиента и сервера Firebase
 let serverOffset = 0;
@@ -271,18 +258,15 @@ onValue(ref(db, ".info/serverTimeOffset"), snap => {
 function nowServer() { return Date.now() + serverOffset; }
 
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src: encodeURI("pidor.mp4") },
-  { title:"петушок великий", src: encodeURI("petyx(nastoyachi).mp4") }
+  { title:"лукашенко взлетает на вертолёт", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892748218044456/pidor.mp4?ex=6a6e7ab9&is=6a6d2939&hm=9139f8a0155670e0a1cb21bad83f207402ca3e0be621145605c7cdabc202131d&" },
+  { title:"петушок великий", src:"https://cdn.discordapp.com/attachments/1027494525326856214/1530892751506378844/petyxnastoyachi.mp4?ex=6a6e7aba&is=6a6d293a&hm=b25e88edc1bad832385f63ffa1699b28ca3a567d65ca79e9ec07d3cfd901b14d&" }
 ];
 
 let current = 0;
 let fadeTimeoutId = null;
 let isHost = false;
 let hostIntendPlaying = false; // осознанно ли ведущий хочет, чтобы видео играло (не путать с mediaEl.paused)
-let haveLock = false;      // держит ли эта вкладка эксклюзивный замок на запись состояния
 let localVolume = 1;
-let lockHeartbeatTimer = null;
-let lockRetryTimer = null;
 let lastKnownState = null;
 let initializedFromRemote = false;
 
@@ -303,7 +287,6 @@ const hostUnlockBox = document.getElementById('hostUnlockBox');
 const hostPassInput = document.getElementById('hostPassInput');
 const volSlider = document.getElementById('volSlider');
 const localMuteBtn = document.getElementById('localMuteBtn');
-const lockDot = document.getElementById('lockDot');
 
 qCount.textContent = tracks.length + ' шт.';
 
@@ -375,11 +358,16 @@ mediaEl.addEventListener('play', ()=>{
 mediaEl.addEventListener('pause', ()=>{
   playBtn.textContent = '▶';
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+  if (mediaEl.ended) {
+    // трек реально закончился — это не сворачивание окна и не ручная
+    // пауза, дальше сам себя не перезапускаем
+    hostIntendPlaying = false;
+  }
   if (isHost) {
     if (hostIntendPlaying) {
       // это браузер сам остановил декодирование (например, при сворачивании
-      // окна), а не осознанный клик по паузе — тихо возобновляем и не рвём
-      // трансляцию у зрителей
+      // окна), а не осознанный конец/клик по паузе — тихо возобновляем и не
+      // рвём трансляцию у зрителей
       mediaEl.play().catch(()=>{});
     } else {
       writeState();
@@ -390,10 +378,10 @@ mediaEl.addEventListener('pause', ()=>{
 // более настойчивая подстраховка: после автопаузы от сворачивания окна
 // браузер иногда молча игнорирует одиночный повторный play() — поэтому
 // продолжаем пробовать раз в секунду, пока он не пустит воспроизведение
-// обратно (полностью гарантировать работу в свёрнутом окне на всех
-// браузерах нельзя — это ограничение самого браузера, а не кода)
+// обратно. !mediaEl.ended — обязательно, иначе на реально закончившемся
+// видео play() перематывает его на начало и получается "повтор"
 setInterval(() => {
-  if (isHost && hostIntendPlaying && mediaEl.paused) {
+  if (isHost && hostIntendPlaying && mediaEl.paused && !mediaEl.ended) {
     mediaEl.play().catch(()=>{});
   }
 }, 1000);
@@ -480,14 +468,13 @@ document.getElementById('stage').addEventListener('click', () => {
 /* ============ синхронизация ============ */
 
 function writeState(){
-  if (!isHost || !haveLock) return;
+  if (!isHost) return;
   update(stateRef, {
     track: current,
     isPlaying: !mediaEl.paused,
     position: mediaEl.currentTime || 0,
     volume: localVolume,
-    updatedAt: serverTimestamp(),
-    session: sessionId
+    updatedAt: serverTimestamp()
   });
 }
 
@@ -572,57 +559,12 @@ hostPassInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') tryLogin();
 });
 
-/* ============ эксклюзивный замок на управление (защита от 2+ ведущих) ============ */
-
-async function claimLock(){
-  try {
-    await set(hostLockRef, { session: sessionId, ts: serverTimestamp() });
-    haveLock = true;
-    lockDot.classList.remove('waiting');
-    lockDot.classList.add('on');
-    onDisconnect(hostLockRef).remove(); // если эта вкладка отвалится — замок освобождается сразу
-    if (lockRetryTimer) { clearInterval(lockRetryTimer); lockRetryTimer = null; }
-    if (!lockHeartbeatTimer) {
-      lockHeartbeatTimer = setInterval(() => {
-        if (!haveLock) return;
-        update(hostLockRef, { ts: serverTimestamp() }).catch(() => {
-          haveLock = false;
-          lockDot.classList.remove('on');
-        });
-      }, 8000);
-    }
-    writeState(); // сразу публикуем текущее локальное состояние зрителям
-  } catch (e) {
-    // замок сейчас держит другая (живая) сессия — просто периодически пробуем снова
-    haveLock = false;
-    lockDot.classList.remove('on');
-    lockDot.classList.add('waiting');
-    if (!lockRetryTimer) {
-      lockRetryTimer = setInterval(claimLock, LOCK_STALE_MS / 3);
-    }
-  }
-}
-
-function releaseLockLocal(){
-  haveLock = false;
-  lockDot.classList.remove('on', 'waiting');
-  if (lockHeartbeatTimer) { clearInterval(lockHeartbeatTimer); lockHeartbeatTimer = null; }
-  if (lockRetryTimer) { clearInterval(lockRetryTimer); lockRetryTimer = null; }
-}
-
 onAuthStateChanged(auth, user => {
   isHost = !!user;
   document.body.classList.toggle('guest-mode', !isHost);
-  if (isHost) claimLock();
-  else releaseLockLocal();
 });
 
 loadTrack();
-renderQueue();
-</script>
-</body>
-</html>
-
 renderQueue();
 </script>
 </body>
