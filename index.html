@@ -256,10 +256,10 @@ onValue(ref(db, ".info/serverTimeOffset"), snap => {
   serverOffset = snap.val() || 0;
 });
 function nowServer() { return Date.now() + serverOffset; }
-
+  
 const tracks = [
-  { title:"лукашенко взлетает на вертолёт", src: encodeURI("pidor.mp4") },
-  { title:"петушок великий", src: encodeURI("petyx(nastoyachi).mp4") }
+  { title: "лукашенко взлетает на вертолёт", src: encodeURI("video/pidor.mp4") },
+  { title: "петушок великий", src: encodeURI("video/petyx(nastoyachi).mp4") }
 ];
 
 let current = 0;
